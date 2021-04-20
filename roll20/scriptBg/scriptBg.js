@@ -1,24 +1,27 @@
-// 글로벌 변수
-var regExp = /[\{\}\[\]\/?.,;:|\)*~`!^\-+<>@\#$%&\\\=\(\'\"\s]/gi;
-var regEn_B = /[A-Za-z]/g;
-var regEn_S = /[lijtf]/g;
-var line = 0;
-var scriptBg;
-var scriptPos;
-var namePos;
-var boxH;
-var scriptApiOn = false;
-var pause = true;
-var chkSendChat = 0;
-var intervalTime = 80;
-var fontColor = {
+//글로벌 상수
+const regExp = /[\{\}\[\]\/?.,;:|\)*~`!^\-+<>@\#$%&\\\=\(\'\"\s]/gi;
+const regEn_B = /[A-Za-z]/g;
+const regEn_S = /[lijtf]/g;
+//글로벌 변수
+let line = 0;
+let scriptBg;
+let scriptPos;
+let namePos;
+let boxH;
+let scriptApiOn = false;
+let pause = true;
+let chkSendChat = 0;
+let chatStop = false;
+let intervalTime = 80;
+let settingData;
+let fontColor = {
     'scriptColor': "#ffffff",
     'nameColor': '#ffffff',
     'descColor': '#ffffff'
 } //기본 글씨색
 
 on('change:graphic', function(obj, prev){
-    var settingData = findObjs({ type: 'graphic', name: 'ssTok' }); 
+    settingData = findObjs({ type: 'graphic', name: 'ssTok' }); 
     if ( !settingData[0] ) {
         return;
     } else {
@@ -44,11 +47,15 @@ on('chat:message', function(msg) {
     var scriptText;
     var chatMsg = msg.content;
     var chatName = msg.who;
+    let character;
     scriptBg = getBg()[0];
+    
     if (scriptApiOn == true) {
-        if (!scriptBg) {
-            sendChat("SYSTEM", "/w gm 스크립트가 출력될 배경을 설정해주세요! 배경의 이름은 반드시 'scriptBg' 여야 합니다.");
-        } else {
+        chatStop = (msg.who == "scriptBG")? true : false;
+        if (!scriptBg && chatStop == false ) {
+            sendChat("scriptBG", "/w gm 스크립트가 출력될 배경을 설정해주세요! 배경의 이름은 반드시 'scriptBg' 여야 합니다.", chatStop = true);
+        } else if ( scriptBg ) {
+            log("ok");
             scriptPos = {
                 'top': scriptBg.get('top'),
                 'left': scriptBg.get('left'),
@@ -85,20 +92,141 @@ on('chat:message', function(msg) {
                     controlledby: ""
                 });
             }
-        }
-        if (msg.type == "general") {
-            // 일반채팅 초기화
-            var scriptArr = chatMsg.split('');
-            var textW = lengWidthCal(chatMsg);
-            var textH = 0;
-            var nameW = lengWidthCal(chatName);
-            var alignLeft = scriptPos['left'];
-            log(chatMsg); //채팅 메세지 확인
-            scriptText = getText();
 
-            if ( chkSendChat == 1) {
-                return;
-            } else {
+            let scriptArr;
+            let textW;
+            let textH;
+            let nameW;
+            let alignLeft;
+            if (msg.type == "general") {
+                // 일반채팅 초기화
+                scriptArr = chatMsg.split('');
+                textW = lengWidthCal(chatMsg);
+                textH = 0;
+                nameW = lengWidthCal(chatName);
+                alignLeft = scriptPos['left'];
+                log(chatMsg); //채팅 메세지 확인
+                scriptText = getText();
+
+                if ( chkSendChat == 1) {
+                    return;
+                } else {
+                    if (textW >= scriptPos['width']) {
+                        // 1줄이상일 경우 처리
+                        scriptArr = autoEnter(scriptPos['width'], chatMsg, scriptArr);
+                        chatMsg = scriptArr.join('');
+                        textH = parseInt(line) * 20;
+                        if (scriptText[0] !== 0) {
+                            log(scriptText);
+                            scriptText[0].set({
+                                text: chatName,
+                                font_size: 16,
+                                color: fontColor['nameColor'],
+                                top: namePos['top'],
+                                left: alignLeftScript(nameW) + 30,
+                                controlledby: ""
+                            });
+                            scriptText[1].set({
+                                text: chatMsg,
+                                font_size: 14,
+                                color: fontColor['scriptColor'],
+                                top: alignTopScript(textH),
+                                left: alignLeft,
+                                controlledby: ""
+                            });
+                        }
+                    } else {
+                        // 1줄일 경우 처리
+                        alignLeft = alignLeftScript(textW) + 30;
+                        chatMsg = scriptArr.join('');
+                        if (scriptText[0] !== 0) {
+                            log(scriptText);
+                            scriptText[0].set({
+                                text: chatName,
+                                font_size: 16,
+                                color: fontColor['nameColor'],
+                                top: namePos['top'],
+                                left: alignLeftScript(nameW) + 30,
+                                controlledby: ""
+                            });
+                            scriptText[1].set({
+                                text: chatMsg,
+                                font_size: 14,
+                                color: fontColor['scriptColor'],
+                                top: scriptPos['top'],
+                                left: alignLeft,
+                                controlledby: ""
+                            });
+                        }
+                    }
+                }
+
+            }
+            //타이핑 효과 모드
+            if (msg.type == "api" && msg.content.indexOf("!tp") === 0) {
+                // 일반채팅 초기화
+                chatMsg = chatMsg.replace('!tp', '');
+                character = findObjs({ type: 'character', name: msg.who })[0];
+                sendChat('character|' + character.id, chatMsg, chkSendChat=1);
+                scriptArr = chatMsg.split('');
+                textW = lengWidthCal(chatMsg);
+                textH = 0;
+                nameW = lengWidthCal(chatName);
+                alignLeft = scriptPos['left'];
+                log(chatMsg); //채팅 메세지 확인
+                scriptText = getText();
+                scriptArr = autoEnter(scriptPos['width'], chatMsg, scriptArr);
+                chatMsg = scriptArr.join('');
+                textH = parseInt(line) * 20;
+                log("타이핑모드")
+                pause = false;
+                if (scriptText[0] !== 0) {
+                    if (pause == false) {
+                        log(scriptText);
+                        scriptText[0].set({
+                            text: chatName,
+                            font_size: 16,
+                            color: fontColor['nameColor'],
+                            top: namePos['top'],
+                            left: alignLeftScript(nameW) + 30,
+                            controlledby: ""
+                        });
+                        var i = 0;
+                        chatMsg = "";
+                        var it = setInterval(function () {
+                            if (i++ < scriptArr.length) {
+                                chatMsg += scriptArr[i - 1];
+                                scriptText[1].set({
+                                    text: chatMsg,
+                                    font_size: 14,
+                                    color: fontColor['scriptColor'],
+                                    top: alignTopScript(textH),
+                                    left: alignLeft,
+                                    controlledby: ""
+                                });
+
+                            } else {
+                                clearInterval(it);
+                                chkSendChat=0;
+                            }
+                        }, intervalTime);
+                    } else {
+                        clearInterval(it);
+                    }
+                }
+
+            }
+
+            if (msg.type == "desc") {
+                //desc 처리
+                //초기화
+                scriptArr = chatMsg.split('');
+                textW = lengWidthCal(chatMsg);
+                textH = 0;
+                nameW = lengWidthCal(chatName);
+                alignLeft = scriptPos['left'];
+                log(chatMsg); //채팅 메세지 확인
+                scriptText = getText();
                 if (textW >= scriptPos['width']) {
                     // 1줄이상일 경우 처리
                     scriptArr = autoEnter(scriptPos['width'], chatMsg, scriptArr);
@@ -109,7 +237,6 @@ on('chat:message', function(msg) {
                         scriptText[0].set({
                             text: chatName,
                             font_size: 16,
-                            color: fontColor['nameColor'],
                             top: namePos['top'],
                             left: alignLeftScript(nameW) + 30,
                             controlledby: ""
@@ -117,9 +244,9 @@ on('chat:message', function(msg) {
                         scriptText[1].set({
                             text: chatMsg,
                             font_size: 14,
-                            color: fontColor['scriptColor'],
+                            color: fontColor['descColor'],
                             top: alignTopScript(textH),
-                            left: alignLeft,
+                            left: scriptPos['left'],
                             controlledby: ""
                         });
                     }
@@ -132,7 +259,6 @@ on('chat:message', function(msg) {
                         scriptText[0].set({
                             text: chatName,
                             font_size: 16,
-                            color: fontColor['nameColor'],
                             top: namePos['top'],
                             left: alignLeftScript(nameW) + 30,
                             controlledby: ""
@@ -140,131 +266,15 @@ on('chat:message', function(msg) {
                         scriptText[1].set({
                             text: chatMsg,
                             font_size: 14,
-                            color: fontColor['scriptColor'],
+                            color: fontColor['descColor'],
                             top: scriptPos['top'],
-                            left: alignLeft,
+                            left: scriptPos['left'],
                             controlledby: ""
                         });
                     }
                 }
             }
-
-        }
-        //타이핑 효과 모드
-        if (msg.type == "api" && msg.content.indexOf("!tp") === 0) {
-            // 일반채팅 초기화
-            chatMsg = chatMsg.replace('!tp', '');
-            var character = findObjs({ type: 'character', name: msg.who })[0];
-            sendChat('character|' + character.id, chatMsg, chkSendChat=1);
-            var scriptArr = chatMsg.split('');
-            var textW = lengWidthCal(chatMsg);
-            var textH = 0;
-            var nameW = lengWidthCal(chatName);
-            var alignLeft = scriptPos['left'];
-            log(chatMsg); //채팅 메세지 확인
-            scriptText = getText();
-            scriptArr = autoEnter(scriptPos['width'], chatMsg, scriptArr);
-            chatMsg = scriptArr.join('');
-            textH = parseInt(line) * 20;
-            log("타이핑모드")
-            pause = false;
-            if (scriptText[0] !== 0) {
-                if (pause == false) {
-                    log(scriptText);
-                    scriptText[0].set({
-                        text: chatName,
-                        font_size: 16,
-                        color: fontColor['nameColor'],
-                        top: namePos['top'],
-                        left: alignLeftScript(nameW) + 30,
-                        controlledby: ""
-                    });
-                    var i = 0;
-                    chatMsg = "";
-                    var it = setInterval(function () {
-                        // if (pause == true) {
-                        //     clearInterval(it);
-                        // }
-                        if (i++ < scriptArr.length) {
-                            chatMsg += scriptArr[i - 1];
-                            scriptText[1].set({
-                                text: chatMsg,
-                                font_size: 14,
-                                color: fontColor['scriptColor'],
-                                top: alignTopScript(textH),
-                                left: alignLeft,
-                                controlledby: ""
-                            });
-
-                        } else {
-                            clearInterval(it);
-                            chkSendChat=0;
-                        }
-                    }, intervalTime);
-                } else {
-                    clearInterval(it);
-                }
-            }
-
-        }
-
-        if (msg.type == "desc") {
-            //desc 처리
-            //초기화
-            var scriptArr = chatMsg.split('');
-            var textW = lengWidthCal(chatMsg);
-            var textH = 0;
-            var nameW = lengWidthCal(chatName);
-            var alignLeft = scriptPos['left'];
-            log(chatMsg); //채팅 메세지 확인
-            scriptText = getText();
-            if (textW >= scriptPos['width']) {
-                // 1줄이상일 경우 처리
-                scriptArr = autoEnter(scriptPos['width'], chatMsg, scriptArr);
-                chatMsg = scriptArr.join('');
-                textH = parseInt(line) * 20;
-                if (scriptText[0] !== 0) {
-                    log(scriptText);
-                    scriptText[0].set({
-                        text: chatName,
-                        font_size: 16,
-                        top: namePos['top'],
-                        left: alignLeftScript(nameW) + 30,
-                        controlledby: ""
-                    });
-                    scriptText[1].set({
-                        text: chatMsg,
-                        font_size: 14,
-                        color: fontColor['descColor'],
-                        top: alignTopScript(textH),
-                        left: scriptPos['left'],
-                        controlledby: ""
-                    });
-                }
-            } else {
-                // 1줄일 경우 처리
-                alignLeft = alignLeftScript(textW) + 30;
-                chatMsg = scriptArr.join('');
-                if (scriptText[0] !== 0) {
-                    log(scriptText);
-                    scriptText[0].set({
-                        text: chatName,
-                        font_size: 16,
-                        top: namePos['top'],
-                        left: alignLeftScript(nameW) + 30,
-                        controlledby: ""
-                    });
-                    scriptText[1].set({
-                        text: chatMsg,
-                        font_size: 14,
-                        color: fontColor['descColor'],
-                        top: scriptPos['top'],
-                        left: scriptPos['left'],
-                        controlledby: ""
-                    });
-                }
-            }
-        }
+        }        
     } else {
         log("스크립트를 실행시켜 주세요! 명령어는 !sbOn 입니다.");
     } 
@@ -296,15 +306,15 @@ function getBg() {
 //문자열 가로길이 계산
 function lengWidthCal(string) {
     //문자 폭 추정값 입력
-    var text = 16;
-    var spe = 5;
-    var engB = 10;
-    var engS = 4;
-    var result = 0;
-    var cntnotText = (string.match(regExp)||[]).length;
-    var cntEngSText = (string.match(regEn_S)||[]).length;
-    var cntEngBText = (string.match(regEn_B)||[]).length - cntEngSText;
-    var cntText = string.length - cntnotText - cntEngBText - cntEngSText;
+    const text = 16;
+    const spe = 5;
+    const engB = 10;
+    const engS = 4;
+    let result = 0;
+    let cntnotText = (string.match(regExp)||[]).length;
+    let cntEngSText = (string.match(regEn_S)||[]).length;
+    let cntEngBText = (string.match(regEn_B)||[]).length - cntEngSText;
+    let cntText = string.length - cntnotText - cntEngBText - cntEngSText;
 
     result = cntnotText*spe + cntText*text + cntEngBText*engB + cntEngSText*engS;
 
@@ -313,9 +323,9 @@ function lengWidthCal(string) {
 
 //줄바꿈 처리
 function autoEnter(width, script, scriptArr) {
-    var stringW = lengWidthCal(script);
-    var wordW = 0;
-    var lineCnt = 0;
+    let stringW = lengWidthCal(script);
+    let wordW = 0;
+    let lineCnt = 0;
     if (stringW >= width) {
         for (var i in script) {
             console.log(script[i]);
