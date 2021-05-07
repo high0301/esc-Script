@@ -166,8 +166,7 @@ on('chat:message', function(msg) {
             if (msg.type == "api" && msg.content.indexOf("!tp") === 0) {
                 // 일반채팅 초기화
                 chatMsg = chatMsg.replace('!tp', '');
-                character = findObjs({ type: 'character', name: msg.who })[0];
-                sendChat('character|' + character.id, chatMsg, chkSendChat=1);
+                sendChat(msg.who, chatMsg, chkSendChat=1);
                 scriptArr = chatMsg.split('');
                 textW = lengWidthCal(chatMsg);
                 textH = 0;
