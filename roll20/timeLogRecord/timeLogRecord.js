@@ -17,7 +17,7 @@ on('chat:message', function (msg) {
     today = new Date();
     utc = today.getTime() + (today.getTimezoneOffset() * 60 * 1000);
     kr_today = new Date(utc + (KR_TIME_DIFF));
-    log(kr_today);
+    
     if (msg.type == "api" && msg.content.indexOf("!time") === 0) {
         logHour = kr_today.getHours();
         logMin = kr_today.getMinutes();
